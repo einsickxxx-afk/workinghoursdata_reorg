@@ -1850,7 +1850,7 @@ function exportTeamHTML(scopeMode){
       const reorgMarker = 'const REORG = ';
       const gs = html.indexOf(reorgMarker);
       if(gs !== -1){ const ge = html.indexOf(';', gs); html = html.slice(0, gs) + reorgMarker + JSON.stringify({ month: REORG.month, teams: REORG.teams.filter(t => SCOPE.teams.includes(t)) }) + html.slice(ge); }
-      html = html.replace('<h1>해양사업부 근무실적 현황</h1>', `<h1>해양사업부 ${SCOPE.label} 근무실적 현황</h1>`);
+      html = html.replace('<h1>해양사업부 근무실적 현황</h1>', `<h1>${SCOPE.label} 근무실적 현황</h1>`);
    }
 
    const today = new Date();
