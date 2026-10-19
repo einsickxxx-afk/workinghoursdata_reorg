@@ -1151,11 +1151,12 @@ const EXCLUDE_WORKTYPE = '근태예외자';
 // ---- 조직 설정: 조직개편·겸직 발생 시 이 부분만 수정 ----
 // 겸직: 사번 → 겸직 팀 목록 (CSV상 소속팀을 함께 적어도 무방, 중복 자동 제거)
 const CONCURRENT_ROLES = {
-  '24102640': ['기획팀', '신규사업팀'], // 예시값
+  '25053651': ['Smart Vessel사업팀', '플랫폼체계팀'], 
 };
 // 조직개편: 적용월(YYYYMM)에만 해당 팀의 전월 대비를 "조직개편으로 비교 불가" 처리
-const REORG = { month: '202609', teams: ['기획팀', '신규사업팀'] }; // 예시값
+const REORG = { month: '202611', teams: ['Smart Battleship설계팀', 'Smart Vessel사업팀', '플랫폼체계팀'] };
 const MIN_TEAM_SIZE = 2; // 이 인원 미만 팀은 팀 평균 비표시
+const HOURS_CAP = {min: 40, max: 52 }; // 주 근무시간 보정: 40시간 미만은 40.0, 52시간 초과는 52.0으로 통일
 // 필터 저장본 전용: 저장 시점의 사업부 전체 기준값 (원본 파일에서는 null 유지)
 const EMBEDDED_ORG_SNAPSHOT = null;
 let MOVE_MAP = {}; // 사번 → '구팀→신팀' (당월 월중 이동자)
@@ -2022,6 +2023,7 @@ function buildFilterOptions(){
 /* ===================== 유틸 ===================== */
 function num(v){ const n = parseFloat(v); return isNaN(n) ? 0 : n; }
 function numH(v){ return num(v)/60; } /* 원본 데이터가 분 단위이므로 시간으로 환산 */
+function clampQ(r){ return Math.min(HOURS_CAP.max, Math.max(HOURS_CAP.min, numH(r['주확정근무시간']))); } /*주 근무시간 보정값*/
 function weekKey(r){
   const m = (r['주차']||'').match(/(\d+)\s*주차/);
   const wn = m ? String(m[1]).padStart(2,'0') : '00';
@@ -2115,7 +2117,7 @@ function getOrgStats(targetMonth){
   const base = (src) => {
     const out = src.filter(r => r['구분'] !== EXCLUDE_WORKTYPE && !EXEC_RANKS.includes(r['직급'])
       && parseInt(r['년월'],10) >= hireYYYYMM(r['사번']) && numH(r['주확정근무시간']) > 0);
-    out.forEach(r => { r._week = weekKey(r); r._Q = numH(r['주확정근무시간']); });
+    out.forEach(r => { r._week = weekKey(r); r._Q = clampQ(r); });
     return out;
   };
   const curM = buildMonthlyRows(base(RAW_ROWS), targetMonth);
@@ -2150,10 +2152,10 @@ function computeEmployeeDetail(empId){
     r['구분'] !== EXCLUDE_WORKTYPE && !EXEC_RANKS.includes(r['직급'])
     && numH(r['주확정근무시간']) > 0
   );
-  baseRows.forEach(r => { r._Q = numH(r['주확정근무시간']); }); // 다른 함수 실행 순서에 의존하지 않도록 여기서 직접 계산
+  baseRows.forEach(r => { r._Q = clampQ(r)); }); // 다른 함수 실행 순서에 의존하지 않도록 여기서 직접 계산
   const empRows = baseRows.filter(r => r['사번'] === empId);
   if(!empRows.length) return null;
-  empRows.forEach(r => { r._week = weekKey(r); r._Q = numH(r['주확정근무시간']); });
+  empRows.forEach(r => { r._week = weekKey(r); r._Q = clampQ(r); });
   empRows.sort((a,b) => a._week.localeCompare(b._week));
   const weekKeysAll = [...new Set(empRows.map(r=>r._week))].sort();
   const last = empRows[empRows.length-1];
@@ -2186,7 +2188,7 @@ function computeEmployeeDetail(empId){
      );
      const prevEmpRows = prevBaseRows.filter(r => r['사번'] === empId);
      if(prevEmpRows.length){
-        prevMonthAvg = prevEmpRows.reduce((s,r)=>s+numH(r['주확정근무시간']),0)/prevEmpRows.length;
+        prevMonthAvg = prevEmpRows.reduce((s,r)=>s+clampQ(r),0)/prevEmpRows.length;
      }
   }
 
@@ -2271,7 +2273,7 @@ function render(){
   if(site !== 'all') rows = rows.filter(r => r['사업장'] === site);
   if(team !== 'all') rows = rows.filter(r => inTeam(r, team));
 
-  rows.forEach(r => { r._week = weekKey(r); r._Q = numH(r['주확정근무시간']); });
+  rows.forEach(r => { r._week = weekKey(r); r._Q = clampQ(r); });
 
   const weekKeys = [...new Set(rows.map(r=>r._week))].sort();
   if(weekKeys.length === 0){
@@ -2299,7 +2301,7 @@ function render(){
      );
      if(site !== 'all') prevRows = prevRows.filter(r => r['사업장'] === site);
      if(team !== 'all') prevRows = prevRows.filter(r => inTeam(r, team));
-     prevRows.forEach(r => { r._week = weekKey(r); r._Q = numH(r['주확정근무시간']); });
+     prevRows.forEach(r => { r._week = weekKey(r); r._Q = clampQ(r); });
      const prevMonthKeys = [...new Set(prevRows.map(r=>r['년월']))].sort();
      const prevMonth = prevMonthKeys[prevMonthKeys.length-1];
      if(prevMonth) prevTeamGroups = buildTeamGroups(prevRows, prevMonth);
